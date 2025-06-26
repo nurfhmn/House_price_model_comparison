@@ -1,0 +1,63 @@
+---
+title: "California Housing Price Forecast Model Comparison"
+author: "Fehime Nur Göbeller"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Libraries
+
+```{r, warning=FALSE,echo=TRUE,include=FALSE}
+ library(tidyverse)
+ library(caret)
+ library(randomForest)
+ library(e1071)
+```
+
+Load and preapre dataset
+
+```{r setup, warning=FALSE, echo=TRUE}
+data <- read.csv("housing.csv")
+data$total_bedrooms[is.na(data$total_bedrooms)] <- median(data$total_bedrooms, na.rm = TRUE)
+data <- cbind(data, model.matrix(~ ocean_proximity - 1, data))
+data$ocean_proximity <- NULL
+X <- data %>% select(-median_house_value)
+y <- data$median_house_value
+set.seed(42)
+splitIndex <- createDataPartition(y, p = .8, list = FALSE)
+X_train <- X[splitIndex, ]
+X_test <- X[-splitIndex, ]
+y_train <- y[splitIndex]
+y_test <- y[-splitIndex]
+```
+
+Define models and apply them to the dataset
+
+```{r}
+model_lr <- lm(y_train ~ ., data = X_train)
+pred_lr <- predict(model_lr, newdata = X_test)
+mse_lr <- mean((y_test - pred_lr)^2)
+mae_lr <- mean(abs(y_test - pred_lr))
+r2_lr <- cor(y_test, pred_lr)^2
+
+model_svr <- svm(X_train, y_train, type = "eps-regression")
+pred_svr <- predict(model_svr, X_test)
+mse_svr <- mean((y_test - pred_svr)^2)
+mae_svr <- mean(abs(y_test - pred_svr))
+r2_svr <- cor(y_test, pred_svr)^2
+
+model_rf <- randomForest(X_train, y_train)
+pred_rf <- predict(model_rf, X_test)
+mse_rf <- mean((y_test - pred_rf)^2)
+mae_rf <- mean(abs(y_test - pred_rf))
+r2_rf <- cor(y_test, pred_rf)^2
+
+results <- data.frame(
+  Model = c("Linear Regression", "SVR", "Random Forest"),
+  MSE = c(mse_lr, mse_svr, mse_rf),
+  MAE = c(mae_lr, mae_svr, mae_rf),
+  R2 = c(r2_lr, r2_svr, r2_rf)
+ )
+knitr::kable(results)
+```
+
